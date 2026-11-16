@@ -51,6 +51,7 @@ const menus = [
   { label: 'Stem',     url: '/backend/stems',        icon: 'fa-list' },
   { label: '캡쳐',     url: '/backend/capture',      icon: 'fa-camera' },
   { label: 'imgBB',    url: '/backend/imagesBB',     icon: 'fa-image' },
+  { label: 'DB 백업',  url: '/backend/backup',       icon: 'fa-database' },
 ];
 
 // /backend/times 가 /backend/timesImport 까지 활성화하지 않도록 정확히 구분

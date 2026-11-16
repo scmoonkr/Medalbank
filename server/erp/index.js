@@ -3,10 +3,12 @@
 // server/index.js 에 같이 띄우려면 .env 에 ERP_MOUNT=true (그러면 /erp/ 로 서비스).
 import app from './app.js'
 import { ensureIndexes } from './db.js'
+import { backup } from './backup.js'
 
 const PORT = process.env.ERP_PORT || 6643
 
 ensureIndexes().catch((e) => console.error('[erp] 인덱스 생성 실패:', e.message))
+backup.init()      // updatedAt 보정 + (ERP_BACKUP_INTERVAL 이 있으면) 예약 백업
 
 app.listen(PORT, () => {
   console.log(`ERP running on http://localhost:${PORT}`)

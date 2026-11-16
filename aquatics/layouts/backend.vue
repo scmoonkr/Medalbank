@@ -30,6 +30,10 @@
           <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M13 3H3a1 1 0 00-1 1v7a1 1 0 001 1h2l3 2 3-2h2a1 1 0 001-1V4a1 1 0 00-1-1z"/></svg>
           촬영요청
         </NuxtLink>
+        <NuxtLink to="/backend/backup" :class="{ active: route.path === '/backend/backup' }">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><ellipse cx="8" cy="3.5" rx="5.5" ry="2"/><path d="M2.5 3.5v9c0 1.1 2.5 2 5.5 2s5.5-.9 5.5-2v-9M2.5 8c0 1.1 2.5 2 5.5 2s5.5-.9 5.5-2"/></svg>
+          DB 백업
+        </NuxtLink>
       </nav>
     </aside>
     <main class="bk-main">

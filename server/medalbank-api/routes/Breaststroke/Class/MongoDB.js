@@ -4,6 +4,9 @@ var Duplex 			= require('stream').Duplex;  //== buffer to stream에서 사용
 var mongodb 		= require('mongodb');
 var extend 			= require('node.extend');
 var mongoCFG  	= require('../Config/mongoCFG');
+// 쓰기에 updatedAt 을 자동으로 넣는다 — 증분 백업(server/backup 의 Breaststroke 백업) 기준. 공용 구현: server/lib/stamp.cjs
+const { stampDb } = require('../../../../lib/stamp.cjs');
+const NO_STAMP = ['fs.files', 'fs.chunks'];
 // const { constants } = require('crypto');
 var MongoClient = mongodb.MongoClient;
 
@@ -188,7 +191,7 @@ class MongoDB {
 		const client = new MongoClient(this.dbURL, this.mongoOption);
 		try {
 			await client.connect();
-			const db 				= client.db(dbname);
+			const db 				= stampDb(client.db(dbname), NO_STAMP);
 			let result 			= await db.createCollection(collname)
 			returnObj.data 	= result;
 		} catch(e) {
@@ -208,7 +211,7 @@ class MongoDB {
 		try {
 			const res = await this.dropCollection(viewName);
 			await client.connect();
-			const db 				= client.db(dbname);
+			const db 				= stampDb(client.db(dbname), NO_STAMP);
 			const result 		= await db.createCollection(
 				viewName,
 												{
@@ -230,7 +233,7 @@ class MongoDB {
 		const client = new MongoClient(this.dbURL);
 		try {
 			await client.connect();
-			const db = client.db(dbname);
+			const db = stampDb(client.db(dbname), NO_STAMP);
 			let result = await db.collection(collname).deleteMany(query);
 			result = await db.collection(collname).insertMany(value)
 			returnObj.data = result.ops;
@@ -253,7 +256,7 @@ class MongoDB {
 		const client = new MongoClient(this.dbURL, this.mongoOption);
 		try {
 			await client.connect();
-			const db 				= client.db(dbname);
+			const db 				= stampDb(client.db(dbname), NO_STAMP);
 			// let result1			= await db.createCollection(collname);
 			let collection	= await db.collection(collname);
 			let result			= await collection.createIndex( query, options );
@@ -294,7 +297,7 @@ class MongoDB {
 		const client = new MongoClient(this.dbURL, this.mongoOption);
 		try {
 			await client.connect();
-			const db 				= client.db(dbname);
+			const db 				= stampDb(client.db(dbname), NO_STAMP);
 			let collection	= await db.collection(collname);
 			let result			= await collection.dropIndexes();
 			returnObj.data = result;
@@ -314,7 +317,7 @@ class MongoDB {
 		const client = new MongoClient(this.dbURL, this.mongoOption);
 		try {
 			await client.connect();
-			const db 				= client.db(dbname);
+			const db 				= stampDb(client.db(dbname), NO_STAMP);
 			let collection	= await db.collection(collname);
 			let result			= await collection.drop();
 			returnObj.data = result;
@@ -356,7 +359,7 @@ class MongoDB {
 		const client = new MongoClient(this.dbURL);
 		try {
 			await client.connect();
-			const db 				= client.db(dbname);
+			const db 				= stampDb(client.db(dbname), NO_STAMP);
 			// let collection	= await db.collection(collname);
 			returnObj 			= await db.collection(collname).countDocuments(query);
 			// returnObj: 2
@@ -382,7 +385,7 @@ class MongoDB {
 		const client = new MongoClient(this.dbURL);
 		try {
 			await client.connect();
-			const db 		= client.db(dbname);
+			const db 		= stampDb(client.db(dbname), NO_STAMP);
 			let result 	= await db.collection(collname)
 															.find(query)
 															.sort(sort)
@@ -415,7 +418,7 @@ class MongoDB {
 		const client = new MongoClient(this.dbURL);
 		try {
 			await client.connect();
-			const db 		= client.db(dbname);
+			const db 		= stampDb(client.db(dbname), NO_STAMP);
 			let result 	= await db.collection(collname)
 															.find({})
 															.sort(sort)
@@ -443,7 +446,7 @@ class MongoDB {
 		const client = new MongoClient(this.dbURL);
 		try {
 			await client.connect();
-			const db 		= client.db(dbname);
+			const db 		= stampDb(client.db(dbname), NO_STAMP);
 			let result 	= await db.collection(collname)
 															.find(query)
 															.sort(sort)
@@ -481,7 +484,7 @@ class MongoDB {
 		const client = new MongoClient(this.dbURL);
 		try {
 			await client.connect();
-			const db = client.db(dbname);
+			const db = stampDb(client.db(dbname), NO_STAMP);
 			let result = await db.collection(collname).aggregate(aggregate).toArray();
 			returnObj = (result.length === 0 ? 1 : result[0]["_id"] + 1);
 		} catch(e) {
@@ -510,7 +513,7 @@ class MongoDB {
 		const client = new MongoClient(this.dbURL);
 		try {
 			await client.connect();
-			const db 				= client.db(dbname);
+			const db 				= stampDb(client.db(dbname), NO_STAMP);
 			let result 			= await db.collection(collname).insertOne(value) 
 			returnObj.data 	= result.insertedId.toString();
 		} catch(error) {
@@ -544,7 +547,7 @@ class MongoDB {
 		const client = new MongoClient(this.dbURL);
 		try {
 			await client.connect();
-			const db = client.db(dbname);
+			const db = stampDb(client.db(dbname), NO_STAMP);
 
 			const cleanedData = value.map(doc => {
 				const { _id, ...rest } = doc; // _id 필드 제거
@@ -585,7 +588,7 @@ class MongoDB {
 		const client = new MongoClient(this.dbURL);
 		try {
 			await client.connect();
-			const db = client.db(dbname);
+			const db = stampDb(client.db(dbname), NO_STAMP);
 
 			// 청크 단위로 나누어 실행
 			const CHUNK_SIZE = 1000;
@@ -611,7 +614,7 @@ class MongoDB {
 		const client = new MongoClient(this.dbURL);
 		try {
 			await client.connect();
-			const db 				= client.db(dbname);
+			const db 				= stampDb(client.db(dbname), NO_STAMP);
 			returnObj.data 	= await db.collection(collname).distinct( field, query );
 			/*
 				[ 'test' ]
@@ -635,7 +638,7 @@ class MongoDB {
 		const client = new MongoClient(this.dbURL);
 		try {
 			await client.connect();
-			const db = client.db(dbname);
+			const db = stampDb(client.db(dbname), NO_STAMP);
 			let result = await db.collection(collname)
 															.find(query)
 															.project(projection)
@@ -682,7 +685,7 @@ class MongoDB {
 		// console.log("context.query=", context.query, collname);
 		try {
 			await client.connect();
-			const db = client.db(dbname);
+			const db = stampDb(client.db(dbname), NO_STAMP);
 			// console.log("dbname=", dbname);
 
 			returnObj.count	= await db.collection(collname).countDocuments( context.query);
@@ -719,7 +722,7 @@ class MongoDB {
 		const client = new MongoClient(this.dbURL);
 		try {
 			await client.connect();
-			const db = client.db(dbname);
+			const db = stampDb(client.db(dbname), NO_STAMP);
 			let result = await db.collection(collname).deleteOne(query);
 			// console.log(result)																		
 			returnObj.data = result.deletedCount;
@@ -747,7 +750,7 @@ class MongoDB {
 		const client = new MongoClient(this.dbURL);
 		try {
 			await client.connect();
-			const db = client.db(dbname);
+			const db = stampDb(client.db(dbname), NO_STAMP);
 			let result = await db.collection(collname).deleteMany(query);
 			returnObj.data = result.deletedCount;
 		} catch(e) {
@@ -767,7 +770,7 @@ class MongoDB {
 		const client = new MongoClient(this.dbURL);
 		try {
 			await client.connect();
-			const db = client.db(dbname);
+			const db = stampDb(client.db(dbname), NO_STAMP);
 			let result = await db.collection(collname).replaceOne(query, value);
 			// console.log(result)			
 			returnObj.data = result.modifiedCount;
@@ -798,7 +801,7 @@ class MongoDB {
 		const client = new MongoClient(this.dbURL);
 		try {
 			await client.connect();
-			const db = client.db(dbname);
+			const db = stampDb(client.db(dbname), NO_STAMP);
 
 			let result = await db.collection(collname).updateOne(query, { $set: value }, { upsert: true });
 			/*
@@ -828,7 +831,7 @@ class MongoDB {
 		const client = new MongoClient(this.dbURL);
 		try {
 			await client.connect();
-			const db = client.db(dbname);
+			const db = stampDb(client.db(dbname), NO_STAMP);
 
 			let result = await db.collection(collname).updateOne(query, value, options);
 			// console.log(
@@ -858,7 +861,7 @@ class MongoDB {
 		const client = new MongoClient(this.dbURL);
 		try {
 			await client.connect();
-			const db = client.db(dbname);
+			const db = stampDb(client.db(dbname), NO_STAMP);
 			let result = await db.collection(collname).updateMany(query, { $set: value }, { upsert: false } );
 			// console.log(result)
 			returnObj.data = result.modifiedCount;
@@ -875,7 +878,7 @@ class MongoDB {
 		const client = new MongoClient(this.dbURL);
 		try {
 			await client.connect();
-			const db = client.db(dbname);
+			const db = stampDb(client.db(dbname), NO_STAMP);
 			let result = await db.collection(collname).updateMany(query, value, { upsert: true } );
 			// console.log(result)
 			returnObj.data = result.modifiedCount;
@@ -896,7 +899,7 @@ class MongoDB {
 		const client = new MongoClient(this.dbURL);
 		try {
 			await client.connect();
-			const db = client.db(dbname);
+			const db = stampDb(client.db(dbname), NO_STAMP);
 			let result = await db.collection(collname).findOneAndUpdate(query, value, options );		
 
 			returnObj.data = value; // result.value // modify되기 전 record
@@ -976,7 +979,7 @@ db.pub.update(
 		const client = new MongoClient(this.dbURL);
 		try {
 			await client.connect();
-			const db = client.db(dbname);
+			const db = stampDb(client.db(dbname), NO_STAMP);
 			let result = await db.collection(collname).find(query, { $set: value }, { upsert: true } );		
 
 			returnObj.data = value; // result.value // modify되기 전 record
@@ -1002,7 +1005,7 @@ db.pub.update(
 		const client = new MongoClient(this.dbURL);
 		try {
 			await client.connect();
-			const db = client.db(dbname);
+			const db = stampDb(client.db(dbname), NO_STAMP);
 
 			let result = await db.collection(collname).updateOne(query, { $push: value });
 			/*
@@ -1036,7 +1039,7 @@ db.pub.update(
 		const client = new MongoClient(this.dbURL);
 		try {
 			await client.connect();
-			const db = client.db(dbname);
+			const db = stampDb(client.db(dbname), NO_STAMP);
 
 			// let svalue = {}
 			// svalue[`${field}.$`] = value;
@@ -1073,7 +1076,7 @@ db.pub.update(
 		const client = new MongoClient(this.dbURL);
 		try {
 			await client.connect();
-			const db = client.db(dbname);
+			const db = stampDb(client.db(dbname), NO_STAMP);
 
 			let result = await db.collection(collname).updateOne(query, { $pull: subQuery }, { upsert: true });
 			/*
@@ -1100,7 +1103,7 @@ db.pub.update(
 		const client = new MongoClient(this.dbURL);
 		try {
 			await client.connect();
-			const db = client.db(dbname);
+			const db = stampDb(client.db(dbname), NO_STAMP);
 
 			let result = await db.collection(collname).aggregate(aggregate, { allowDiskUse: true }).toArray();
 			// console.log(result)
@@ -1131,7 +1134,7 @@ db.pub.update(
 		const client = new MongoClient(this.dbURL);
 		try {
 			await client.connect();
-			const db = client.db(dbname);
+			const db = stampDb(client.db(dbname), NO_STAMP);
 
 			const bucket = new mongodb.GridFSBucket(db);
 			const reqFile = context.reqFile;  //multipart로 넘어와 	upload.any()로 filter하면 files[]array type,
@@ -1167,7 +1170,7 @@ db.pub.update(
 		const client = new MongoClient(this.dbURL);
 		try {
 			await client.connect();
-			const db = client.db(dbname);
+			const db = stampDb(client.db(dbname), NO_STAMP);
 
 			let base64Chunks = '';
 			const fileName = context.fileName;			//req.body.photoName사용

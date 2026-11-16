@@ -16,6 +16,7 @@ const NEED: Record<string, string[]> = {
   '/venues': ['data'],
   '/teams': ['data'],
   '/start-list': ['data'],
+  '/backup': ['users'],          // DB 백업 — 관리자만
 }
 
 export default defineNuxtRouteMiddleware(async (to) => {

@@ -17,6 +17,7 @@ import countsRouter from './routes/counts.js'
 import streamRouter from './routes/stream.js'
 import authRouter from './routes/auth.js'
 import { userFromRequest, serviceUser, canAny } from './auth.js'
+import { backup } from './backup.js'
 
 // 모노레포 루트의 .env 를 로드 (서버 cwd 와 무관하게)
 const __dirname = path.dirname(fileURLToPath(import.meta.url)) // server/src
@@ -74,6 +75,16 @@ app.use('/api', async (req, res, next) => {
     res.status(500).json({ error: e.message })
   }
 })
+
+// DB 백업·복원 — 읽기(GET)도 포함해 전부 관리자(users)만. 위의 공통 검사는 GET 을 통과시키므로 여기서 따로 막는다.
+app.use('/api/backup', async (req, res, next) => {
+  try {
+    const u = await userFromRequest(req)
+    if (!u || !canAny(u, ['users'])) return res.status(u ? 403 : 401).json({ error: u ? '관리자만 쓸 수 있습니다.' : '로그인이 필요합니다.' })
+    req.user = u
+    next()
+  } catch (e) { res.status(500).json({ error: e.message }) }
+}, backup.router)
 
 app.use('/api/events', eventsRouter)
 app.use('/api/categories', categoriesRouter)

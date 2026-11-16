@@ -36,7 +36,11 @@ if (process.env.ERP_MOUNT === 'true') {
 for (const [prefix, file] of mounts) {
   try {
     app.use(prefix, (await import(file)).default)
-    if (prefix === '/erp') (await import('./erp/db.js')).ensureIndexes().catch((e) => console.error('[erp] 인덱스 생성 실패:', e.message))
+    if (prefix === '/sp') (await import('./swimmingPhotography/backup.js')).backup.init()      // updatedAt 보정 + (SP_BACKUP_INTERVAL 이 있으면) 예약 백업
+    if (prefix === '/erp') {
+      (await import('./erp/db.js')).ensureIndexes().catch((e) => console.error('[erp] 인덱스 생성 실패:', e.message))
+      ;(await import('./erp/backup.js')).backup.init()
+    }
   } catch (e) {
     console.error(`[${prefix}] mount failed:`, e?.message || e)
   }
@@ -46,10 +50,17 @@ app.use(express.json())
 app.use((req, res, next) => {
   res.setHeader('Access-Control-Allow-Origin', '*')
   res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS')
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type,Authorization,Accept')
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type,Authorization,Accept,X-Backup-Key')
+  res.setHeader('Access-Control-Expose-Headers', 'X-Backup-Filename')
   if (req.method === 'OPTIONS') return res.sendStatus(204)
   next()
 })
+
+// DB 백업·복원 (aquatics 백엔드 화면) — 키가 맞아야만 열린다. 라우트 등록보다 먼저 둔다.
+const { backup, requireBackupKey } = await import('./backup.js')
+app.use('/api/admin/backup', requireBackupKey, backup.router)
+const { backup: brBackup, requireBackupKey: requireBrKey } = await import('./breaststrokeBackup.js')
+app.use('/BR/backup', requireBrKey, brBackup.router)      // breaststroke 백엔드 화면
 
 const GIT_HASH = (() => {
   try { return execSync('git rev-parse --short HEAD', { cwd: dirname(fileURLToPath(import.meta.url)) }).toString().trim() }
@@ -78,6 +89,8 @@ try {
 
 connectDB().then(async () => {
   await ensureIndexes()
+  backup.init()      // updatedAt 보정 + (AQUATICS_BACKUP_INTERVAL 이 있으면) 예약 백업
+  brBackup.init()    // Breaststroke DB: updatedAt 보정 + (BREASTSTROKE_BACKUP_INTERVAL 이 있으면) 예약 백업
   // atomic image_id 카운터 초기화 ($max: 현재값보다 클 때만 갱신, upsert로 없으면 생성)
   const { getDB } = await import('./db.js')
   const { images } = await import('./models/Image.js')

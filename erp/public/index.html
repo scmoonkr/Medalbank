@@ -199,6 +199,7 @@ const MENU = [
   ]],
   ['설정', [
     ['settings', '설정', '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/>'],
+    ['backup', 'DB 백업', '<ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v14c0 1.7 3.6 3 8 3s8-1.3 8-3V5M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3"/>'],
   ]],
   ['smartstore', [
     ['ssorders', '주문', '<path d="M4 3h16v18l-3-2-3 2-3-2-3 2-3-2-1 1V3Z"/><path d="M8 8h8M8 12h8M8 16h4"/>'],
@@ -208,7 +209,7 @@ const MENU = [
 ]
 const VIEWS = {
   materials: () => viewItems('materials'), goods: () => viewItems('goods'), ssorders: () => viewSsOrders('normal'), sscustom: () => viewSsOrders('custom'), ssship: () => viewSsOrders('ship'),
-  settings: () => viewSettings(), worksheets: () => viewWorksheets(), designs: () => viewDesigns(), dmap: () => viewDesignMap(), machines: () => viewMachines(), assign: () => viewAssign(), schedule: () => viewSchedule(), stock: () => viewStock(), po: () => viewPO(), ship: () => viewShip(), stocktake: () => viewStocktake(),
+  settings: () => viewSettings(), backup: () => viewBackup(), worksheets: () => viewWorksheets(), designs: () => viewDesigns(), dmap: () => viewDesignMap(), machines: () => viewMachines(), assign: () => viewAssign(), schedule: () => viewSchedule(), stock: () => viewStock(), po: () => viewPO(), ship: () => viewShip(), stocktake: () => viewStocktake(),
 }
 
 function render() {
@@ -228,7 +229,9 @@ function render() {
     return
   }
   // 작업자(worker)는 작업관리만 쓴다
-  const MENU_SHOWN = me.role === 'worker' ? MENU.filter((g) => g[0] === '작업') : MENU
+  const ADMIN_ONLY = ['backup']
+  const MENU_SHOWN = (me.role === 'worker' ? MENU.filter((g) => g[0] === '작업') : MENU)
+    .map(([sec, items]) => [sec, me.role === 'admin' ? items : items.filter((t) => !ADMIN_ONLY.includes(t[0]))])
   if (me.role === 'worker' && tab !== 'schedule') tab = 'schedule'
   const cur = MENU_SHOWN.flatMap((g) => g[1]).find((t) => t[0] === tab)
   const nav = MENU_SHOWN.map(([sec, items]) => `<div class="nav-sec">${sec}</div>${items.map(([k, l, ic]) =>
@@ -3526,6 +3529,103 @@ async function makeWorksheets(mode, btnEl, layout = 'one') {
     }
     pdf.save(`작업지시서_${WS.all ? ymd(new Date()) : WS.date}.pdf`)
   } catch (e) { alert(e.message) } finally { document.getElementById('ws_render')?.classList.remove('pdfmode'); btn.disabled = false; btn.textContent = label }
+}
+
+// ── // DB 백업·복원 (관리자) ───────────────────────────────────
+const nowKst = () => { const k = new Date(Date.now() + 9 * 3600e3); return k.toISOString().slice(0, 19).replace('T', ' ') }
+async function downloadZip(path, body) {
+  const r = await fetch(BASE + '/api' + path, { method: 'POST', credentials: 'same-origin', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body || {}) })
+  if (!r.ok) { const j = await r.json().catch(() => ({})); throw new Error(j.error || r.statusText) }
+  const blob = await r.blob()
+  const a = document.createElement('a')
+  a.href = URL.createObjectURL(blob)
+  a.download = r.headers.get('x-backup-filename') || 'erp-backup.zip'
+  document.body.appendChild(a); a.click(); a.remove()
+  setTimeout(() => URL.revokeObjectURL(a.href), 5000)
+}
+// 백업 JSON(Extended JSON) 값을 표에 보이기 좋게 한 줄 문자열로
+function bkCell(v) {
+  if (v === null || v === undefined) return ''
+  if (typeof v === 'object') {
+    if ('$oid' in v) return v.$oid
+    if ('$date' in v) { const d = new Date(typeof v.$date === 'object' ? Number(v.$date.$numberLong) : v.$date); return isNaN(d) ? String(v.$date) : new Date(d.getTime() + 9 * 3600e3).toISOString().slice(0, 19).replace('T', ' ') }
+    if ('$numberLong' in v) return v.$numberLong
+    if ('$numberDecimal' in v) return v.$numberDecimal
+    return JSON.stringify(v)
+  }
+  return String(v)
+}
+async function viewBackup() {
+  const last = (() => { try { return localStorage.getItem('erpLastBackupKst') } catch (e) { return null } })()
+  $('#main').innerHTML = `<div class="page-head"><div class="ph-main"><div class="ph-en">Backup</div><h1>DB 백업</h1>
+    <p class="ph-sub">관리자 전용입니다. 로그인 세션(sessions)은 백업·복원 대상이 아닙니다.</p></div></div>
+    <section class="set-card"><header><h2>전체 백업</h2><p>모든 컬렉션을 JSON 으로 덤프해 zip 으로 내려받습니다.</p></header>
+      <footer><span class="set-msg" id="bk_full_msg"></span><button type="button" class="btn btn-primary" id="bk_full">전체 백업 다운로드</button></footer></section>
+    <section class="set-card"><header><h2>증분 백업</h2><p>입력한 시각(한국시간) 이후 수정된(updatedAt) 문서만 zip 으로 내려받습니다. 삭제된 문서는 포함되지 않습니다.</p></header>
+      <div class="set-body"><label class="field"><span class="field-label">기준 시각 (yyyy-mm-dd hh:mm:ss)</span>
+        <input class="field-input" id="bk_since" value="${esc(last || '')}" placeholder="2026-11-14 00:00:00" autocomplete="off"></label></div>
+      <footer><span class="set-msg" id="bk_inc_msg"></span><button type="button" class="btn btn-primary" id="bk_inc">증분 백업 다운로드</button></footer></section>
+    <section class="set-card"><header><h2>클라우드 즉시 백업</h2><p>지금 바로 백업을 만들어 클라우드 저장소(iDrive e2, <b>erp/</b> 폴더)에 올립니다. 예약 백업과 같은 기준 시각을 씁니다.</p></header>
+      <div class="set-body"><label class="field"><span class="field-label">방식</span><select class="field-input" id="bk_cloud_mode"><option value="incremental" selected>증분 (마지막 백업 이후)</option><option value="full">전체 덤프</option></select></label></div>
+      <footer><span class="set-msg" id="bk_cloud_msg"></span><button type="button" class="btn btn-primary" id="bk_cloud">지금 클라우드에 백업</button></footer></section>
+    <section class="set-card"><header><h2>복원</h2><p>컬렉션을 고르고 백업 zip 안의 <b>컬렉션 JSON 파일</b>을 선택하면 내용을 표로 확인한 뒤 복원합니다. 같은 _id 는 덮어쓰고 없는 문서는 추가하며, 파일에 없는 문서는 건드리지 않습니다.</p></header>
+      <div class="set-body"><label class="field"><span class="field-label">컬렉션</span><select class="field-input" id="bk_col"><option value="">불러오는 중…</option></select></label>
+        <label class="field"><span class="field-label">백업 JSON 파일</span><input class="field-input" type="file" id="bk_file" accept=".json,application/json"></label>
+        <div id="bk_prev"></div></div>
+      <footer><span class="set-msg" id="bk_res_msg"></span><button type="button" class="btn btn-primary" id="bk_restore" disabled>복원</button></footer></section>`
+  const msg = (id, t, bad) => { const e = $('#' + id); e.textContent = t; e.style.color = bad ? '#c0392b' : '' }
+  const run = async (btnId, msgId, path, body) => {
+    const b = $('#' + btnId); b.disabled = true; msg(msgId, '만드는 중…')
+    try { await downloadZip(path, body); msg(msgId, '다운로드했습니다.'); try { localStorage.setItem('erpLastBackupKst', nowKst()) } catch (e) { /* 저장 불가 */ } }
+    catch (e) { msg(msgId, e.message, true) } finally { b.disabled = false }
+  }
+  $('#bk_full').onclick = () => run('bk_full', 'bk_full_msg', '/backup/full')
+  $('#bk_cloud').onclick = async () => {
+    const b = $('#bk_cloud'); b.disabled = true; msg('bk_cloud_msg', '백업해서 올리는 중…')
+    try {
+      const j = await api('/backup/cloud', { method: 'POST', body: { mode: $('#bk_cloud_mode').value } })
+      msg('bk_cloud_msg', j.skipped ? `변경된 문서가 없어 올리지 않았습니다. (기준 ${j.since})` : `업로드 완료 — ${j.key} · ${j.total}건 · ${(j.bytes / 1024).toFixed(1)}KB (${j.mode === 'full' ? '전체' : '증분'})`)
+    } catch (e) { msg('bk_cloud_msg', e.message, true) } finally { b.disabled = false }
+  }
+  $('#bk_inc').onclick = () => run('bk_inc', 'bk_inc_msg', '/backup/incremental', { since: $('#bk_since').value.trim() })
+
+  let names = []
+  try { names = (await api('/backup/collections')).items } catch (e) { msg('bk_res_msg', e.message, true) }
+  $('#bk_col').innerHTML = `<option value="">컬렉션 선택</option>` + names.map((n) => `<option value="${esc(n)}">${esc(n)}</option>`).join('')
+  let docs = null
+  const sync = () => { $('#bk_restore').disabled = !(docs && docs.length && $('#bk_col').value) }
+  $('#bk_col').onchange = sync
+  $('#bk_file').onchange = async (e) => {
+    const f = e.target.files[0]; docs = null; $('#bk_prev').innerHTML = ''; msg('bk_res_msg', ''); sync()
+    if (!f) return
+    const base = f.name.replace(/\.json$/i, '')
+    if (names.includes(base) && !$('#bk_col').value) $('#bk_col').value = base
+    try {
+      const j = JSON.parse(await f.text())
+      if (!Array.isArray(j)) throw new Error('백업 파일은 문서 배열이어야 합니다. (manifest.json 이 아닌 컬렉션 JSON 을 고르세요)')
+      if (j.some((d) => !d || typeof d !== 'object' || !('_id' in d))) throw new Error('_id 가 없는 문서가 있습니다.')
+      docs = j
+    } catch (x) { $('#bk_prev').innerHTML = `<div class="sch-hint">${esc(x.message)}</div>`; return }
+    const cols = [...new Set(docs.flatMap((d) => Object.keys(d)))]
+    const show = docs.slice(0, 50)
+    $('#bk_prev').innerHTML = `<div class="sch-hint">${docs.length}건${docs.length > show.length ? ` 중 앞 ${show.length}건만 표시` : ''} · 필드 ${cols.length}개</div>
+      <div class="table-scroll" style="max-height:340px"><table class="data"><thead><tr>${cols.map((c) => `<th>${esc(c)}</th>`).join('')}</tr></thead><tbody>${
+        show.map((d) => `<tr>${cols.map((c) => { const t = bkCell(d[c]); return `<td title="${esc(t)}">${esc(t.length > 60 ? t.slice(0, 60) + '…' : t)}</td>` }).join('')}</tr>`).join('')}</tbody></table></div>`
+    sync()
+  }
+  $('#bk_restore').onclick = async () => {
+    const name = $('#bk_col').value, f = $('#bk_file').files[0]
+    if (!name || !f || !docs) return
+    if (!confirm(`'${name}' 컬렉션에 ${docs.length}건을 복원합니다.\n같은 _id 의 문서는 파일 내용으로 덮어씁니다. 계속할까요?`)) return
+    const b = $('#bk_restore'); b.disabled = true; msg('bk_res_msg', '복원 중…')
+    try {
+      const fd = new FormData(); fd.append('collection', name); fd.append('file', f)
+      const r = await fetch(BASE + '/api/backup/restore', { method: 'POST', credentials: 'same-origin', body: fd })
+      const j = await r.json().catch(() => ({}))
+      if (!r.ok) throw new Error(j.error || r.statusText)
+      msg('bk_res_msg', `복원 완료 — 전체 ${j.total}건 (추가 ${j.inserted}, 수정 ${j.updated})`)
+    } catch (e) { msg('bk_res_msg', e.message, true) } finally { sync() }
+  }
 }
 
 // ── 설정 ─────────────────────────────────────────────────

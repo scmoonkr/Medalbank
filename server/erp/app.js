@@ -25,6 +25,7 @@ const { default: settingsRouter } = await import('./routes/settings.js')
 const { default: designsRouter } = await import('./routes/designs.js')
 const { default: machinesRouter } = await import('./routes/machines.js')
 const { default: productionRouter } = await import('./routes/production.js')
+const { backup } = await import('./backup.js')
 
 const app = express()
 
@@ -42,6 +43,7 @@ app.use('/api/auth', authRouter)
 // 이 아래는 전부 로그인 필수. 쓰기/삭제 권한은 라우터 안에서 requireCap 으로 가른다.
 app.use('/api', requireAuth)
 app.use('/api/users', requireCap('users'), usersRouter)
+app.use('/api/backup', requireCap('users'), backup.router)      // DB 백업·복원 — 관리자 전용
 app.use('/api/orders', ordersRouter)
 app.use('/api/smartstore-orders', ssOrdersRouter)
 app.use('/api/materials', materialsRouter)

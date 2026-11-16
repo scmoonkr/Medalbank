@@ -1,6 +1,7 @@
 // MongoDB 연결 — 사진 서비스(server)와 같은 서버·계정(.env)을 쓰되, 데이터베이스는 MedalbankERP 로 분리한다.
 // 계정·세션·주문 등 업무관리 데이터는 사진 서비스 DB 와 섞이지 않는다.
 import { MongoClient } from 'mongodb'
+import { stamped } from '../lib/dbBackup.js'
 
 let clientPromise = null
 
@@ -23,7 +24,12 @@ export function getClient() {
 }
 
 export const DB = async () => (await getClient()).db(process.env.MONGO_DBNAME_ERP || 'MedalbankERP')
-export const col = async (name) => (await DB()).collection(name)
+export const rawCol = async (name) => (await DB()).collection(name)
+// 쓰기에 updatedAt 을 자동으로 넣는다(lib/dbBackup.js) — 증분 백업 기준. 원본 값을 보존해야 하면 rawCol 을 쓴다.
+export const col = async (name) => {
+  const c = await rawCol(name)
+  return name === 'sessions' ? c : stamped(c)
+}
 
 // 주문번호 등 순번 — counters 컬렉션의 원자적 증가
 export async function nextSeq(name) {
