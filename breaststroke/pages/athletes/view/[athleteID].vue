@@ -159,16 +159,7 @@ const menus = ref([
 	{ label: '선수명단', path: '/athletes' },
 ])
 
-///########################################################
-useSeoContent({
-	title: athleteData.value.name,
-	url: route.fullPath,
-	description: '평영하는 사람',
-	type: 'article',
-	image: athleteData.value.featured ? featured.value : "/images/brststrk_logo_meta.png",
-	site_name: '평영',
-})
-///########################################################
+// SEO 메타는 아래 try 블록에서 SSR 로 받은 데이터로 설정한다(여기서는 데이터가 아직 없다).
 
 //-----------------------------------------------
 // profile table options
@@ -289,6 +280,23 @@ try {
 			return res
 		}
 	)
+
+	// ✅ SEO — 서버에서 받은 선수 정보로 title·description·og 를 SSR 시점에 설정한다
+	{
+		const a = data.value?.data
+		if (a?.name) {
+			useSeoContent({
+				title: `${a.name} 선수 수영 기록 — 평영`,
+				url: route.path,
+				description: `${a.name} 선수의 수영 개인 기록·종목별 베스트·대회 결과를 확인하세요.`,
+				type: 'profile',
+				image: a.featured ? getImageURL(a.featured) : `/cms/images/athletes/${a.athleteID}/f`,
+				site_name: '평영',
+			})
+		} else {
+			useSeoContent({ title: '선수를 찾을 수 없습니다 — 평영', url: route.path, noindex: true })
+		}
+	}
 
 	if (data.value.data?.times?.length > 0) {
 		// const response = await athleteStore.fetchAthleteDetailBR(athleteId, "BR");

@@ -114,6 +114,29 @@ async function loadServerData() {
   }
 }
 
+// ✅ SEO — 본문은 클라이언트에서 불러오므로, 크롤러가 읽는 SSR 응답용 메타만 따로 받는다
+{
+  const pid = route.params.poolID;
+  const { data: seo } = await useAsyncData(`seo-pool-${pid}`, async () => {
+    try {
+      const r = await $fetch(`${useRuntimeConfig().public.apiBase}/poolsNew/view`, { method: 'POST', body: { poolID: pid } });
+      return r?.data ?? null;
+    } catch { return null; }
+  });
+  const p = seo.value;
+  if (p?.name) {
+    useSeoContent({
+      title: `${p.name} — 수영장 대회 기록 — 평영`,
+      url: route.path,
+      description: `${p.name}${p.sido ? ` (${p.sido})` : ''}${p.address ? ` · ${p.address}` : ''} 수영장에서 열린 대회 이력과 기록을 확인하세요.`,
+      type: 'article',
+      site_name: '평영',
+    });
+  } else {
+    useSeoContent({ title: '수영장을 찾을 수 없습니다 — 평영', url: route.path, noindex: true });
+  }
+}
+
 // 컴포저블 함수 사용
 usePageNavigation(loadServerData);
 

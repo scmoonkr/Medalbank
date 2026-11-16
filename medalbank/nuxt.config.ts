@@ -39,6 +39,8 @@ export default defineNuxtConfig({
     },
     public: {
       // 공유 API 엔드포인트 (루트 .env). 미설정 시 운영 도메인.
+      // canonical·sitemap·og:image 의 절대 URL 기준
+      siteUrl:    process.env.MEDALBANK_SITE_URL      || 'https://medalbank.com',
       apiBase:    process.env.NUXT_PUBLIC_API_BASE    || 'https://api.medalbank.com',
       serverBase: process.env.NUXT_PUBLIC_SERVER_BASE || 'https://api.medalbank.com',
       naverFormInsert: process.env.NAVER_FORM_INSERT || '',
@@ -58,6 +60,12 @@ export default defineNuxtConfig({
       meta: [
         { name: 'viewport', content: 'width=device-width, initial-scale=1.0' },
         { name: 'description', content: '대한민국 경영 전 종목 종합순위표. 메달뱅크.' },
+        { property: 'og:type', content: 'website' },
+        { property: 'og:site_name', content: '메달뱅크 · Medalbank' },
+        { property: 'og:title', content: '메달뱅크 · Medalbank' },
+        { property: 'og:description', content: '대한민국 경영 전 종목 종합순위표. 메달뱅크.' },
+        { property: 'og:image', content: `${process.env.MEDALBANK_SITE_URL || 'https://medalbank.com'}/images/logo.png` },
+        { name: 'twitter:card', content: 'summary' },
       ],
       link: [
         { rel: 'icon', type: 'image/png', href: '/images/logo.png' },
@@ -72,6 +80,9 @@ export default defineNuxtConfig({
   },
 
   routeRules: {
-    '/backend/**': { ssr: false },
+    '/backend/**': { ssr: false, headers: { 'X-Robots-Tag': 'noindex, nofollow' } },
+    '/login': { headers: { 'X-Robots-Tag': 'noindex, nofollow' } },
+    '/user': { headers: { 'X-Robots-Tag': 'noindex, nofollow' } },
+    '/time/**': { headers: { 'X-Robots-Tag': 'noindex, nofollow' } },
   },
 })

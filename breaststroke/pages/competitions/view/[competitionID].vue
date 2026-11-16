@@ -131,6 +131,31 @@ console.log("competitionStore.currentCompetition=", competitionStore.currentComp
   }
 }
 
+// ✅ SEO — 목록·본문은 클라이언트에서 불러오므로, 크롤러가 읽는 SSR 응답용 메타만 따로 받는다
+{
+	const cid = parseInt(route.params.competitionID as string, 10);
+	const { data: seo } = await useAsyncData(`seo-competition-${cid}`, async () => {
+		try {
+			const r: any = await $fetch(`${useRuntimeConfig().public.apiBase}/BR/competitions/view`, { method: 'POST', body: { competitionID: cid } });
+			return r?.data ?? null;
+		} catch { return null; }
+	});
+	const c: any = seo.value;
+	if (c?.fullname) {
+		useSeoContent({
+			title: `${c.fullname} — 대회 기록 — 평영`,
+			url: route.path,
+			description: `${c.fullname}${c.pool ? ` (${c.pool})` : ''}${c.dateStart ? ` · ${String(c.dateStart).slice(0, 10)}` : ''} 대회의 종목별 결과·참가 선수·팀 기록을 확인하세요.`,
+			type: 'article',
+			image: `/cms/images/competitions/${cid}/f`,
+			site_name: '평영',
+			published: Number.isNaN(Date.parse(c.dateStart)) ? undefined : new Date(c.dateStart).toISOString(),
+		});
+	} else {
+		useSeoContent({ title: '대회를 찾을 수 없습니다 — 평영', url: route.path, noindex: true });
+	}
+}
+
 // 컴포저블 함수 사용
 usePageNavigation(loadServerData);
 

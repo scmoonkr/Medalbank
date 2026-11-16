@@ -49,13 +49,58 @@ const html = computed(() => {
   })
 })
 
+// 기사를 못 찾으면 404 로 응답 — 빈 페이지가 200 으로 색인되지 않게 한다
+if (import.meta.server && !doc.value) setResponseStatus(useRequestEvent()!, 404)
+
+// ── SEO: title·description·og·article:*·JSON-LD(NewsArticle) ──
+const siteUrl = String(useRuntimeConfig().public.siteUrl || '').replace(/\/+$/, '')
+const absImg = (u?: string) => {
+  if (!u) return ''
+  if (/^https?:\/\//i.test(u)) return u
+  const base = String(useRuntimeConfig().public.cloudPublicUrl || '').replace(/\/+$/, '')
+  return u.startsWith('/') && !base ? siteUrl + u : base + '/' + u.replace(/^\/+/, '')
+}
+const iso = (v: any) => { const d = v ? new Date(v) : null; return d && !Number.isNaN(d.getTime()) ? d.toISOString() : undefined }
+
 useHead(() => {
-  const ko = doc.value?.translations?.ko
+  const d = doc.value
+  const ko = d?.translations?.ko
+  const title = ko?.seoTitle || ko?.title
+  const fullTitle = title ? `${title} — Swimming Photography` : 'Swimming Photography'
+  const desc = String(ko?.seoDescription || ko?.excerpt || '').trim()
+  const image = absImg(d?.media?.coverImage || d?.media?.thumb || d?.media?.images?.[0]?.url)
+  const url = `${siteUrl}/article/${encodeURIComponent(slug.value)}`
+  const published = iso(d?.publishedAt || d?.createdAt)
+  const modified = iso(d?.updatedAt) || published
+  const meta: any[] = [
+    { name: 'description', content: desc },
+    { property: 'og:type', content: 'article' },
+    { property: 'og:site_name', content: 'Swimming Photography' },
+    { property: 'og:title', content: title || 'Swimming Photography' },
+    { property: 'og:description', content: desc },
+    { property: 'og:url', content: url },
+    { name: 'twitter:card', content: image ? 'summary_large_image' : 'summary' },
+  ]
+  if (image) meta.push({ property: 'og:image', content: image }, { name: 'twitter:image', content: image })
+  if (published) meta.push({ property: 'article:published_time', content: published })
+  if (modified) meta.push({ property: 'article:modified_time', content: modified })
+  if (!d) meta.push({ name: 'robots', content: 'noindex' })
+  const ld = d ? {
+    '@context': 'https://schema.org',
+    '@type': 'NewsArticle',
+    headline: title || '',
+    description: desc || undefined,
+    image: image ? [image] : undefined,
+    datePublished: published,
+    dateModified: modified,
+    mainEntityOfPage: url,
+    author: d?.reporter?.name ? { '@type': 'Person', name: d.reporter.name } : { '@type': 'Organization', name: 'Swimming Photography' },
+    publisher: { '@type': 'Organization', name: 'Swimming Photography' },
+  } : null
   return {
-    title: ko?.seoTitle || ko?.title
-      ? `${ko?.seoTitle || ko?.title} — Swimming Photography`
-      : 'Swimming Photography',
-    meta: [{ name: 'description', content: ko?.seoDescription || ko?.excerpt || '' }],
+    title: fullTitle,
+    meta,
+    script: ld ? [{ type: 'application/ld+json', innerHTML: JSON.stringify(ld).replace(/</g, '\\u003c') }] : [],
   }
 })
 

@@ -16,6 +16,8 @@ export default defineNuxtConfig({
   // 런타임에 NUXT_PUBLIC_ADMIN_URL 로 덮어쓸 수 있음.
   runtimeConfig: {
     public: {
+      // canonical·sitemap·og:url 의 절대 URL 기준
+      siteUrl: process.env.SP_SITE_URL || 'https://swimmingphotography.com',
       adminUrl: process.env.NUXT_PUBLIC_ADMIN_URL
         || (process.env.NODE_ENV === 'production'
           ? 'https://backend.swimmingphotography.com'
@@ -54,6 +56,13 @@ export default defineNuxtConfig({
         },
       ],
     },
+  },
+
+  // 로그인·내 페이지는 색인하지 않는다 (페이지 meta 와 함께 응답 헤더로도 막는다)
+  routeRules: {
+    '/login': { headers: { 'X-Robots-Tag': 'noindex, nofollow' } },
+    '/signin': { headers: { 'X-Robots-Tag': 'noindex, nofollow' } },
+    '/my/**': { headers: { 'X-Robots-Tag': 'noindex, nofollow' } },
   },
 
   // /api/** 를 통합 서버(6630)의 /sp로 프록시 (dev·프로덕션 공통). SSE 스트림 포함.

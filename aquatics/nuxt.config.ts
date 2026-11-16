@@ -15,6 +15,8 @@ export default defineNuxtConfig({
   runtimeConfig: {
     public: {
       cloudPublicUrl: process.env.CLOUD_PUBLIC_URL ?? '',
+      // canonical·sitemap·og:image 의 절대 URL 기준
+      siteUrl: process.env.AQUATICS_SITE_URL || 'https://medalbankaquatics.com',
       // 공유 API 엔드포인트 (루트 .env). 미설정 시 운영 도메인.
       apiBase:    process.env.NUXT_PUBLIC_API_BASE    || 'https://api.medalbank.com',
       serverBase: process.env.NUXT_PUBLIC_SERVER_BASE || 'https://api.medalbank.com',
@@ -34,9 +36,9 @@ export default defineNuxtConfig({
         { property: 'og:site_name',   content: '메달뱅크 아쿠아틱스' },
         { property: 'og:title',       content: '메달뱅크 아쿠아틱스' },
         { property: 'og:description', content: 'Every heat, every athlete. 수영 대회 전문 사진 서비스.' },
-        { property: 'og:image',       content: '/images/open_graph_meta_image.png' },
+        { property: 'og:image',       content: `${process.env.AQUATICS_SITE_URL || 'https://medalbankaquatics.com'}/images/open_graph_meta_image.png` },
         { name: 'twitter:card',       content: 'summary_large_image' },
-        { name: 'twitter:image',      content: '/images/open_graph_meta_image.png' },
+        { name: 'twitter:image',      content: `${process.env.AQUATICS_SITE_URL || 'https://medalbankaquatics.com'}/images/open_graph_meta_image.png` },
       ],
       link: [
         { rel: 'icon', type: 'image/svg+xml', href: '/favicon.svg' },
@@ -57,7 +59,10 @@ export default defineNuxtConfig({
   },
 
   routeRules: {
-    '/backend/**': { ssr: false },
+    '/backend/**': { ssr: false, headers: { 'X-Robots-Tag': 'noindex, nofollow' } },
+    '/cart': { headers: { 'X-Robots-Tag': 'noindex, nofollow' } },
+    '/consent': { headers: { 'X-Robots-Tag': 'noindex, nofollow' } },
+    '/verify': { headers: { 'X-Robots-Tag': 'noindex, nofollow' } },
   },
 
 })
