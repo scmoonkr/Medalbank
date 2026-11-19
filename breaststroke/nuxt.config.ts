@@ -93,8 +93,10 @@ export default defineNuxtConfig({
   nitro: {
     compressPublicAssets: false,  // gzip/brotli 비활성화
     serveStatic: true,            // static 파일 직접 전송
+    // '/' 를 프리렌더하면 정적 파일로 굳어 점검(준비중) 모드(server/middleware/maintenance.ts)를 우회할 수 있고
+    // 홈 데이터도 빌드 시점 것으로 고정되므로 프리렌더하지 않는다(SSR 로 응답).
     prerender: {
-      routes: ['/'] // 필요한 경우 특정 라우트 프리렌더링
+      routes: []
     }
   },
 

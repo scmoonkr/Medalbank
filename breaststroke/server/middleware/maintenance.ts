@@ -18,6 +18,7 @@ const PAGE = `<!doctype html>
 `
 
 export default defineEventHandler((event) => {
+  if (getHeader(event, 'x-nitro-prerender')) return   // 빌드 중 프리렌더 요청은 막지 않는다(503 이면 빌드가 실패한다)
   const on = String(process.env.BREASTSTROKE_MAINTENANCE || '').toLowerCase()
   if (!['1', 'true', 'on', 'yes'].includes(on)) return
   const path = event.path.split('?')[0]
