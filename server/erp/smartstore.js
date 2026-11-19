@@ -76,6 +76,8 @@ const flat = (it) => {
     product: p.productName || '', option: p.productOption || '', qty: Number(p.quantity) || 0,
     amount: Number(p.totalPaymentAmount ?? p.totalProductAmount) || 0,
     status: p.productOrderStatus || '', memo: p.shippingMemo || '',
+    // 3자물류(네이버 N배송·풀필먼트) 표시 — 물류사 코드(FS)가 있으면 3자물류가 보내는 주문이다. 직접 발송 주문에는 없다.
+    logisticsId: p.logisticsCompanyId || '', expectedCarrier: p.expectedDeliveryCompany || '',
     invoiceCompany: dv.deliveryCompany || '', invoiceCarrier: NAVER_CARRIER[String(dv.deliveryCompany || '').toUpperCase()] || '', invoiceNo: String(dv.trackingNumber || '').split('').filter((ch) => ch >= '0' && ch <= '9').join(''), sentAt: dv.sendDate || '',
   }
 }

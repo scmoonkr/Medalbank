@@ -353,7 +353,7 @@ async function viewSsOrders(kind = 'normal') {
   const isCu = kind === 'custom', isShip = kind === 'ship'   // ship: 배송관리 — 일반·커스텀 주문을 모두 보여 준다
   pageShell({
     en: isShip ? 'Shipping' : isCu ? 'Smartstore Custom Orders' : 'Smartstore Orders', title: isShip ? '배송관리' : isCu ? '스마트스토어 커스텀 주문' : '스마트스토어 주문', addLabel: '',
-    tools: '<input id="q" class="table-search" placeholder="주문번호 · 주문자 · 수취인 · 상품 · 주소 · 톡톡 검색…" type="search"><select id="inv_f" class="table-search" style="flex:none;width:auto" aria-label="송장 필터"><option value="">전체</option><option value="none">송장 없음</option><option value="wait">수거 전</option><option value="picked">수거 완료</option><option value="shipping">배송중</option><option value="done">배송완료</option></select>' + (isShip ? '<span id="sel_n" class="field-hint"></span><select id="bulk_st" class="table-search" style="flex:none;width:auto" aria-label="선택한 건 단계 변경" disabled><option value="">선택 건 단계 변경…</option><option value="wait">수거 전</option><option value="picked">수거 완료</option><option value="shipping">배송중</option><option value="done">배송완료</option></select>' : '') + '<span style="flex:1"></span><button type="button" class="btn btn-ghost" id="ss_open" title="스마트스토어의 최근 주문을 불러와 보고, import 로 가져옵니다">스마트스토어에서 불러오기</button>' + (isShip ? '<button type="button" class="btn btn-primary" id="ship_print" title="체크한 주문의 송장(CJ 라벨)을 인쇄합니다" disabled>송장 인쇄</button><button type="button" class="btn btn-ghost" id="ship_issue" title="보내는 사람 · 받는 사람을 직접 입력해 송장을 발행합니다">송장발행</button>' : ''),
+    tools: '<input id="q" class="table-search" placeholder="주문번호 · 주문자 · 수취인 · 상품 · 주소 · 톡톡 검색…" type="search"><select id="lg_f" class="table-search" style="flex:none;width:auto" aria-label="출고 구분"><option value="">전체</option><option value="medalbank">medalbank</option><option value="3pl">3자물류</option></select><select id="inv_f" class="table-search" style="flex:none;width:auto" aria-label="송장 필터"><option value="">전체</option><option value="none">송장 없음</option><option value="wait">수거 전</option><option value="picked">수거 완료</option><option value="shipping">배송중</option><option value="done">배송완료</option></select>' + (isShip ? '<span id="sel_n" class="field-hint"></span><select id="bulk_st" class="table-search" style="flex:none;width:auto" aria-label="선택한 건 단계 변경" disabled><option value="">선택 건 단계 변경…</option><option value="wait">수거 전</option><option value="picked">수거 완료</option><option value="shipping">배송중</option><option value="done">배송완료</option></select>' : '') + '<span style="flex:1"></span><button type="button" class="btn btn-ghost" id="ss_open" title="스마트스토어의 최근 주문을 불러와 보고, import 로 가져옵니다">스마트스토어에서 불러오기</button>' + (isShip ? '<button type="button" class="btn btn-primary" id="ship_print" title="체크한 주문의 송장(CJ 라벨)을 인쇄합니다" disabled>송장 인쇄</button><button type="button" class="btn btn-ghost" id="ship_issue" title="보내는 사람 · 받는 사람을 직접 입력해 송장을 발행합니다">송장발행</button>' : ''),
   })
   const load = async () => {
     try {
@@ -361,6 +361,7 @@ async function viewSsOrders(kind = 'normal') {
       if (!isShip) p.set('custom', isCu ? '1' : '0')
       if ($('#q')?.value) p.set('q', $('#q').value)
       if ($('#inv_f')?.value) p.set('stage', $('#inv_f').value)
+      if ($('#lg_f')?.value) p.set('logistics', $('#lg_f').value)
       const { items, total } = await api(`/smartstore-orders?${p}`)
       paintTable(items, [
         ...(isShip ? [['chk', '<input type="checkbox" id="chk_all" aria-label="전체 선택">', (o) => `<input type="checkbox" class="row-chk" data-id="${esc(o.productOrderId)}" aria-label="선택">`]] : []),
@@ -377,6 +378,7 @@ async function viewSsOrders(kind = 'normal') {
         ['qty', '수량', (o) => o.qty, 'r'],
         ['amount', '결제금액', (o) => `${Number(o.amount || 0).toLocaleString()}원`, 'r'],
         ['status', '상태', (o) => esc(o.status)],
+        ['lg', '출고', (o) => (o.logistics === '3pl' ? '<span title="3자물류(N배송)가 배송합니다" style="color:var(--accent,#2563eb);font-weight:600">3자물류</span>' : 'medalbank')],
         ...(isShip ? [['size', '크기', (o) => `<select class="size-sel" data-id="${esc(o.productOrderId)}" aria-label="택배 크기"><option value="">-</option>${['극소', '소', '중', '대'].map((z) => `<option ${o.size === z ? 'selected' : ''}>${z}</option>`).join('')}</select>`]] : []),
         ['memo', '배송 메모', (o) => `<div class="ss-wrap memo">${esc(o.memo)}</div>`],
         ['talk', '톡톡', (o) => `<button type="button" class="btn btn-ghost talk-btn${o.talk ? ' on' : ''}" title="${o.talk ? '저장된 톡톡 메시지 보기 · 고치기' : '톡톡 메시지 붙여 넣기'}">톡톡</button>`],
@@ -436,6 +438,7 @@ async function viewSsOrders(kind = 'normal') {
   }
   $('#q')?.addEventListener('input', debounce(load))
   $('#inv_f')?.addEventListener('change', load)
+  $('#lg_f')?.addEventListener('change', load)
   if (isShip) { $('#inv_f').querySelector('option[value="none"]').textContent = '송장발행전'; $('#inv_f').value = 'none' }   // 배송관리는 처음에 송장발행전만 보인다
   $('#ss_open')?.addEventListener('click', () => openSmartstore(load))
   $('#ship_issue')?.addEventListener('click', () => openShipIssue())

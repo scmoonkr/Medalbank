@@ -30,6 +30,22 @@ const stageOf = (o) => {
 }
 const SIZES = ['극소', '소', '중', '대']
 
+// 출고 구분 — '3pl'(3자물류: 네이버 N배송·풀필먼트가 보내는 주문) | 'medalbank'(직접 발송)
+//   네이버 응답의 productOrder.logisticsCompanyId(예: FS)가 있으면 3자물류다. 3자물류 주문은 택배사가 한진(expectedDeliveryCompany=HANJIN)이다.
+//   가져올 때 logisticsId 를 저장한다(직접 발송은 빈 문자열). 이 필드가 없는 옛 주문은 저장해 둔 원본(raw)으로, 그것도 없으면
+//   '스마트스토어가 알려 준 한진 송장'으로 짐작한다 — 다시 가져오면(import) 정확한 값으로 바뀐다.
+const isHanjinSs = (o) => o.invoice?.carrierId === 'hanjin' && o.invoice?.source === 'smartstore'
+const logisticsOf = (o) => {
+  const id = typeof o.logisticsId === 'string' ? o.logisticsId : (o.raw?.productOrder ? (o.raw.productOrder.logisticsCompanyId || '') : (isHanjinSs(o) ? 'FS' : ''))
+  return id ? '3pl' : 'medalbank'
+}
+// logisticsOf 와 같은 기준의 조회 조건 (3자물류인 주문)
+const pl3Conds = () => [
+  { logisticsId: { $exists: true, $nin: ['', null] } },
+  { logisticsId: { $exists: false }, 'raw.productOrder.logisticsCompanyId': { $exists: true, $nin: ['', null] } },
+  { logisticsId: { $exists: false }, 'raw.productOrder': { $exists: false }, 'invoice.carrierId': 'hanjin', 'invoice.source': 'smartstore' },
+]
+
 router.get('/', async (req, res) => {
   try {
     const and = []
@@ -42,6 +58,9 @@ router.get('/', async (req, res) => {
       and.push({ $or: or })
     }
     if (req.query.custom === '1' || req.query.custom === '0') and.push(customFilter(req.query.custom === '1'))
+    // 출고 구분: ?logistics=3pl(3자물류) | medalbank(직접 발송)
+    if (req.query.logistics === '3pl') and.push({ $or: pl3Conds() })
+    else if (req.query.logistics === 'medalbank') and.push({ $nor: pl3Conds() })
     // 송장 단계: ?stage=none | wait | picked | shipping | done
     const has = { 'invoice.trackingNo': { $nin: [null, ''] } }
     const legacy = (k) => ({ 'invoice.stage': { $exists: false }, ...k })
@@ -58,7 +77,7 @@ router.get('/', async (req, res) => {
     const limit = Math.max(1, Math.min(1000, Math.round(num(req.query.limit)) || 300))
     const c = await col('smartstoreOrders')
     const [items, total] = await Promise.all([c.find(q).sort({ paidAt: -1, _id: -1 }).limit(limit).toArray(), c.countDocuments(q)])
-    res.json({ items: items.map((o) => ({ ...o, isCustom: isCustom(o), stage: stageOf(o) })), total })
+    res.json({ items: items.map((o) => ({ ...o, isCustom: isCustom(o), stage: stageOf(o), logistics: logisticsOf(o) })), total })
   } catch (e) { res.status(e.status || 500).json({ error: e.message }) }
 })
 
@@ -79,6 +98,8 @@ router.post('/import', requireCap('orders'), async (req, res) => {
         receiver: str(o.receiver, 60), receiverTel: str(o.receiverTel, 30), address: str(o.address), zip: str(o.zip, 10),
         product: str(o.product, 200), option: str(o.option, 300), qty: Math.max(0, num(o.qty)), amount: Math.max(0, num(o.amount)),
         status: str(o.status, 40), memo: str(o.memo, 500),
+        // 출고 구분 — 이 키가 올 때만 저장한다(예전 화면이 보낸 요청이 '직접 발송'으로 덮어쓰지 않게)
+        ...(o.logisticsId !== undefined ? { logisticsId: str(o.logisticsId, 20), expectedCarrier: str(o.expectedCarrier, 20) } : {}),
       }
       const r = await c.updateOne({ productOrderId }, { $set: { ...fields, updatedAt: now }, $setOnInsert: { productOrderId, importedAt: now, importedBy: req.user.username } }, { upsert: true })
       // 스마트스토어에 송장번호가 있으면 가져온다 — 우리 쪽에서 이미 등록한 송장은 덮어쓰지 않는다
