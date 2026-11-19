@@ -68,8 +68,14 @@ else
     --name medalbank-medalbank --cwd "$PROJECT_DIR/medalbank" --env production
 fi
 
+# 준비중 모드 스위치(.env 의 BREASTSTROKE_MAINTENANCE) — 빌드된 Nuxt 는 .env 를 읽지 않고 PM2 가 넘긴 환경만 본다.
+# .env 전체를 source 하면 공백·<> 가 든 값(EMAIL_FROM, 크론 식 등)에서 깨지므로 이 한 값만 뽑아 넘긴다.
+# 값이 없거나 비어 있으면 빈 문자열이 넘어가 준비중 모드가 꺼진다(--update-env 가 기존 값을 덮어쓴다).
+BREASTSTROKE_MAINTENANCE="$(grep -E '^BREASTSTROKE_MAINTENANCE=' "$PROJECT_DIR/.env" 2>/dev/null | tail -n 1 | cut -d= -f2- | tr -d "\"' ")"
+export BREASTSTROKE_MAINTENANCE
+
 if pm2 list | grep -q "medalbank-breaststroke"; then
-  pm2 restart medalbank-breaststroke
+  pm2 restart medalbank-breaststroke --update-env
 else
   PORT=6633 pm2 start "$PROJECT_DIR/breaststroke/.output/server/index.mjs" \
     --name medalbank-breaststroke --cwd "$PROJECT_DIR/breaststroke" --env production
